@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clinical Progress Note Auditor</title>
+    <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 950px; margin: 0 auto; padding: 30px; background-color: #f0f2f5; }
+        .container { background: #ffffff; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        h1 { color: #1a3a5f; border-bottom: 3px solid #3498db; padding-bottom: 15px; margin-bottom: 30px; }
+        .section-box { margin-bottom: 25px; }
+        label { font-weight: bold; color: #2c3e50; font-size: 1.1em; display: block; margin-bottom: 8px; }
+        .clinical-instruction { font-size: 0.85em; color: #607d8b; font-style: italic; margin-bottom: 10px; }
+        textarea { width: 100%; height: 130px; padding: 15px; border: 1.5px solid #d1d9e0; border-radius: 6px; font-size: 14px; box-sizing: border-box; transition: border 0.3s; }
+        textarea:focus { border-color: #3498db; outline: none; }
+        button { background-color: #1a3a5f; color: white; padding: 15px 30px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: 600; width: 100%; margin-top: 20px; }
+        button:hover { background-color: #2980b9; }
+        #feedbackContainer { margin-top: 35px; padding: 25px; border-radius: 8px; display: none; border-left: 6px solid; }
+        .feedback-pass { background-color: #e8f5e9; border-color: #2e7d32; color: #1b5e20; }
+        .feedback-fail { background-color: #fff3e0; border-color: #ef6c00; color: #e65100; }
+        .feedback-item { margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px dotted #ccc; }
+        .feedback-item:last-child { border-bottom: none; }
+        .check-header { font-weight: bold; text-transform: uppercase; font-size: 0.85em; display: block; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>SOAP Progress Note Assistant</h1>
+
+    <div class="section-box">
+        <label>Subjective (S)</label>
+        <p class="clinical-instruction">Narrate patient reports on activity limitations and body function impairments.</p>
+        <textarea id="s_input" placeholder="Patient reports improved tolerance for stair climbing (Activity), though still notes mild stiffness (Body Function) in the morning..."></textarea>
+    </div>
+
+    <div class="section-box">
+        <label>Objective (O)</label>
+        <p class="clinical-instruction">Document specific skilled interventions and measurable data.</p>
+        <textarea id="o_input" placeholder="Perform grade II joint mobilizations; provided verbal cues for hip-width base of support during gait training..."></textarea>
+    </div>
+
+    <div class="section-box">
+        <label>Assessment (A)</label>
+        <p class="clinical-instruction">Compare current status to initial baseline and state goal progress.</p>
+        <textarea id="a_input" placeholder="Patient has progressed from Max A to Mod A for transfers since initial eval. Goal #1 is 75% complete..."></textarea>
+    </div>
+
+    <div class="section-box">
+        <label>Plan (P)</label>
+        <p class="clinical-instruction">Detail future interventions, frequency, and duration.</p>
+        <textarea id="p_input" placeholder="Continue 2x/week for 4 weeks; focus on progressive resistive exercises and balance perturbation..."></textarea>
+    </div>
+
+    <button onclick="runClinicalAudit()">Analyze Documentation</button>
+
+    <div id="feedbackContainer">
+        <div id="feedbackList"></div>
+    </div>
+</div>
+
+<script>
+    function runClinicalAudit() {
+        const s = document.getElementById('s_input').value;
+        const o = document.getElementById('o_input').value;
+        const a = document.getElementById('a_input').value;
+        const p = document.getElementById('p_input').value;
+        
+        const feedbackContainer = document.getElementById('feedbackContainer');
+        const feedbackList = document.getElementById('feedbackList');
+        let reports = [];
+
+        // 1. S-Section Logic: Checking for Impairment AND Activity
+        const bodyFunctions = ['pain', 'stiff', 'weak', 'numb', 'swelling', 'cramp', 'ache', 'sore', 'range', 'motion'];
+        const activityTerms = ['walking', 'stairs', 'dressing', 'lifting', 'reaching', 'standing', 'driving', 'ADL', 'transfer', 'ambulation', 'bed mobility'];
+        
+        const hasBodyFunction = bodyFunctions.some(word => s.toLowerCase().includes(word));
+        const hasActivity = activityTerms.some(word => s.toLowerCase().includes(word));
+
+        if (!hasBodyFunction && !hasActivity) {
+            reports.push("<strong>[S] Missing Clinical Data:</strong> Please include subjective reports of body function (e.g., pain/stiffness) and activity levels.");
+        } else if (hasBodyFunction && !hasActivity) {
+            reports.push("<strong>[S] Activity Gap:</strong> You noted a body function impairment, but didn't reflect on how it impacts the patient's functional activities (walking, ADLs, etc.).");
+        } else if (!hasBodyFunction && hasActivity) {
+            reports.push("<strong>[S] Impairment Gap:</strong> You noted activity status, but didn't reflect on the underlying body function impairments (pain, strength, etc.) the patient is reporting.");
+        }
+
+        // 2. O-Section Logic: Skilled Treatment
+        const skilledKeywords = ['manual', 'cues', 'instruction', 'facilitated', 'mobilization', 'taping', 'adjusted', 'progression', 'educated'];
+        if (!skilledKeywords.some(word => o.toLowerCase().includes(word))) {
+            reports.push("<strong>[O] Skilled TX Missing:</strong> Use verbs that demonstrate PT skill (e.g., 'provided tactile cues', 'facilitated', 'manually mobilized'). Avoid simple 'patient did' lists.");
+        }
+
+        // 3. A-Section Logic: Comparison & Goals
+        const assessmentKeywords = ['initial', 'eval', 'baseline', 'goal', 'progress', 'improved', 'plateau', '%'];
+        const hasNumber = /\d+/.test(a);
+        if (!assessmentKeywords.some(word => a.toLowerCase().includes(word)) || !hasNumber) {
+            reports.push("<strong>[A] Comparison Alert:</strong> Explicitly state how the patient compares to the initial evaluation and provide a numeric status for specific goals.");
+        }
+
+        // 4. P-Section Logic: Freq/Duration
+        const planKeywords = ['week', 'duration', 'x', 'days', 'month', 'freq'];
+        if (!planKeywords.some(word => p.toLowerCase().includes(word))) {
+            reports.push("<strong>[P] Parameter Alert:</strong> Define the frequency and duration (e.g., 2x/week for 4 weeks) and specific upcoming interventions.");
+        }
+
+        // Display results
+        feedbackList.innerHTML = "";
+        if (reports.length > 0) {
+            feedbackContainer.className = "feedback-fail";
+            reports.forEach(report => {
+                const div = document.createElement('div');
+                div.className = "feedback-item";
+                div.innerHTML = report;
+                feedbackList.appendChild(div);
+            });
+        } else {
+            feedbackContainer.className = "feedback-pass";
+            feedbackList.innerHTML = "<strong>Clinical Audit Complete:</strong> The narration successfully correlates impairments with activity limitations and meets basic documentation standards.";
+        }
+        feedbackContainer.style.display = "block";
+    }
+</script>
+
+</body>
+</html>
